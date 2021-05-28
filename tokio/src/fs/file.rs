@@ -854,6 +854,7 @@ mod preadv2 {
         }
     }
 
+    #[cfg_attr(test, allow(unused))]
     pub(crate) fn has_buggy_preadv2() -> bool {
         let mut uts: MaybeUninit<libc::utsname> = MaybeUninit::uninit();
         let res = unsafe { libc::uname(uts.as_mut_ptr()) };
