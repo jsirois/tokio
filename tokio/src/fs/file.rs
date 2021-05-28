@@ -856,7 +856,7 @@ mod preadv2 {
 
     #[cfg_attr(test, allow(unused))]
     pub(crate) fn has_buggy_preadv2() -> bool {
-        let mut uts: MaybeUninit<libc::utsname> = MaybeUninit::uninit();
+        let mut uts: MaybeUninit<libc::utsname> = MaybeUninit::zeroed();
         let res = unsafe { libc::uname(uts.as_mut_ptr()) };
         if res < 0 {
             // Getting kernel version failed, assume that it's buggy
@@ -864,7 +864,7 @@ mod preadv2 {
         }
         let release = unsafe { CStr::from_ptr((*uts.as_ptr()).release.as_ptr()) };
         let release = release.to_bytes();
-        release[..4] == b"5.9."[..] || release[..5] == b"5.10."[..]
+        release.starts_with(b"5.9.") || release.starts_with(b"5.10.")
     }
 
     #[cfg(test)]
