@@ -861,7 +861,7 @@ mod preadv2 {
             // Getting kernel version failed, assume that it's buggy
             return true;
         }
-        let release = unsafe { CStr::from_ptr((&*uts.as_ptr()).release.as_ptr()) };
+        let release = unsafe { CStr::from_ptr((*uts.as_ptr()).release.as_ptr()) };
         let release = release.to_bytes();
         release[..4] == b"5.9."[..] || release[..5] == b"5.10."[..]
     }
