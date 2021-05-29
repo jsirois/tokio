@@ -5,7 +5,6 @@ use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
 use std::future::Future;
 use std::mem;
-use std::panic;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
 
@@ -383,18 +382,8 @@ enum PollFuture<T> {
 
 fn cancel_task<T: Future>(stage: &CoreStage<T>) -> JoinError {
     // Drop the future from a panic guard.
-    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        stage.drop_future_or_output();
-    }));
-
-    if let Err(err) = res {
-        // Dropping the future panicked, complete the join
-        // handle with the panic to avoid dropping the panic
-        // on the ground.
-        JoinError::panic(err)
-    } else {
-        JoinError::cancelled()
-    }
+    let res = stage.drop_future_or_output();
+    JoinError::cancelled()
 }
 
 fn poll_future<T: Future>(
@@ -406,7 +395,7 @@ fn poll_future<T: Future>(
     if snapshot.is_cancelled() {
         PollFuture::Complete(Err(JoinError::cancelled()), snapshot.is_join_interested())
     } else {
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let res = {
             struct Guard<'a, T: Future> {
                 core: &'a CoreStage<T>,
             }
@@ -425,9 +414,9 @@ fn poll_future<T: Future>(
             mem::forget(guard);
 
             res
-        }));
+        };
         match res {
-            Ok(Poll::Pending) => match header.state.transition_to_idle() {
+            Poll::Pending => match header.state.transition_to_idle() {
                 Ok(snapshot) => {
                     if snapshot.is_notified() {
                         PollFuture::Notified
@@ -437,10 +426,7 @@ fn poll_future<T: Future>(
                 }
                 Err(_) => PollFuture::Complete(Err(cancel_task(core)), true),
             },
-            Ok(Poll::Ready(ok)) => PollFuture::Complete(Ok(ok), snapshot.is_join_interested()),
-            Err(err) => {
-                PollFuture::Complete(Err(JoinError::panic(err)), snapshot.is_join_interested())
-            }
+            Poll::Ready(ok) => PollFuture::Complete(Ok(ok), snapshot.is_join_interested()),
         }
     }
 }
