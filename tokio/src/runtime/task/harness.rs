@@ -383,9 +383,7 @@ enum PollFuture<T> {
 
 fn cancel_task<T: Future>(stage: &CoreStage<T>) -> JoinError {
     // Drop the future from a panic guard.
-    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        stage.drop_future_or_output();
-    }));
+    let res = Ok(stage.drop_future_or_output());
 
     if let Err(err) = res {
         // Dropping the future panicked, complete the join
@@ -406,7 +404,7 @@ fn poll_future<T: Future>(
     if snapshot.is_cancelled() {
         PollFuture::Complete(Err(JoinError::cancelled()), snapshot.is_join_interested())
     } else {
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let res = Ok({
             struct Guard<'a, T: Future> {
                 core: &'a CoreStage<T>,
             }
@@ -425,7 +423,7 @@ fn poll_future<T: Future>(
             mem::forget(guard);
 
             res
-        }));
+        });
         match res {
             Ok(Poll::Pending) => match header.state.transition_to_idle() {
                 Ok(snapshot) => {
